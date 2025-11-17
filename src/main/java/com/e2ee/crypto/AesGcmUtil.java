@@ -9,12 +9,19 @@ import java.util.Base64;
 
 public class AesGcmUtil {
 
+    // 사용할 암호 알고리즘 이름 (JDK에게 알려줄 문자열)
     private static final String ALGORITHM = "AES/GCM/NoPadding";
+
+    // AES 키 길이 (256비트 사용)
     private static final int AES_KEY_SIZE = 256;     // AES 256비트
+
+    // GCM 인증 태그 길이 (128비트 = 16바이트)
     private static final int GCM_TAG_LENGTH = 128;   // 128bit Auth Tag
+
+    // GCM에서 사용하는 nonce(IV) 길이 (12바이트가 표준)
     private static final int NONCE_LENGTH = 12;      // 12byte = GCM 표준
 
-    // 1) 세션키 생성
+    // 1) 세션키 생성 - AES키
     public static SecretKey generateKey() throws Exception {
         KeyGenerator generator = KeyGenerator.getInstance("AES");
         generator.init(AES_KEY_SIZE);
