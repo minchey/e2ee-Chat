@@ -4,6 +4,7 @@ import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
@@ -47,11 +48,23 @@ public class EcdhUtil {
     // 3) 공유 비밀키에서 AES 키 뽑아내기 (HKDF-SHA256, 정석)
     public static SecretKey deriveAesKeyFromSharedSecret(byte[] sharedSecret) throws Exception {
 
+        // 1. HKDF-Extract: PRK 만들기 (salt는 일단 비움)
+        byte[] prk = hkdfExtract(null, sharedSecret);
+
+        // 2. info: 용도 태그 (원하는 문자열 넣어도 됨)
+        byte[] info = "E2EE-Chat-AES-GCM".getBytes(StandardCharsets.UTF_8);
+
+        // 3. HKDF-Expand: 32바이트짜리 AES 키로 확장
+        byte[] okm = hkdfExpand(prk, info, 32); // 32바이트 = 256bit
+
+        // 4. 이 바이트 배열을 AES SecretKey로 포장
+        return new SecretKeySpec(okm, "AES");
     }
 
+    // HKDF-Extract 단계: salt와 sharedSecret으로 PRK 만들기
     private static byte[] hkdfExtract(byte[] salt, byte[] ikm) throws Exception {
         //1. salt가 없으면 32바이트 0으로 대체
-        if(salt == null || salt.length ==0){
+        if (salt == null || salt.length == 0) {
             salt = new byte[32]; //자동으로 0으로 채워짐
         }
 
@@ -64,7 +77,36 @@ public class EcdhUtil {
         return mac.doFinal(ikm);
     }
 
+    // HKDF-Expand 단계: PRK에서 원하는 길이만큼 키 뽑기
     private static byte[] hkdfExpand(byte[] prk, byte[] info, int length) throws Exception {
+        int hashLen = 32; //SHA-256 출력길이
+        int n = (int) Math.ceil((double) length / hashLen);
 
+        byte[] okm = new byte[length]; // Output Keying Material
+        byte[] previousT = new byte[0];
+        int offset = 0;
+
+        Mac mac = Mac.getInstance("HmacSHA256");
+        SecretKeySpec keySpec = new SecretKeySpec(prk, "HmacSHA256");
+        mac.init(keySpec);
+
+        for (int i = 1; i <= n; i++) {
+            mac.reset();
+
+            // T(i) = HMAC-PRK(T(i-1) | info | i)
+            mac.update(previousT);
+            if (info != null) {
+                mac.update(info);
+            }
+            mac.update((byte) i);
+
+            byte[] t = mac.doFinal();
+
+            int bytesToCopy = Math.min(hashLen, length - offset);
+            System.arraycopy(t, 0, okm, offset, bytesToCopy);
+            offset += bytesToCopy;
+            previousT = t;
+        }
+        return okm;
     }
 }
