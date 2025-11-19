@@ -81,4 +81,21 @@ public class ChatMessage {
                 timestamp
         );
     }
+
+    /**
+     * 이 메시지가 CHAT 타입이고, body 안에 암호문이 들어있다고 가정했을 때,
+     * 주어진 E2eeSession으로 복호화하여 평문을 꺼낸다.
+     */
+
+    public String decryptBody(com.e2ee.session.E2eeSession session) throws Exception {
+        if (this.type != MessageType.CHAT) {
+            throw new IllegalStateException("CHAT 타입이 아닌 메시지는 decryptBody를 사용할 수 없습니다.");
+        }
+
+        // 1) body 문자열을 EncryptedPayload로 복원
+        EncryptedPayload payload = EncryptedPayload.fromWireString(this.body);
+
+        // 2) 세션의 AES 키로 복호화
+        return session.decrypt(payload);
+    }
 }
