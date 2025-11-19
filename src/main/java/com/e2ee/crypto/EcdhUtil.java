@@ -109,4 +109,34 @@ public class EcdhUtil {
         }
         return okm;
     }
+    public static void main(String[] args) throws Exception {
+        // 1. A와 B 각각 X25519 키쌍 생성
+        java.security.KeyPair a = generateKeyPair();
+        java.security.KeyPair b = generateKeyPair();
+
+        // 2. 각자 sharedSecret 계산
+        byte[] secretA = deriveSharedSecret(a.getPrivate(), b.getPublic());
+        byte[] secretB = deriveSharedSecret(b.getPrivate(), a.getPublic());
+
+        System.out.println("sharedSecret 동일? " + java.util.Arrays.equals(secretA, secretB));
+
+        // 3. 각자 sharedSecret에서 AES 키 생성(HKDF)
+        javax.crypto.SecretKey aesKeyA = deriveAesKeyFromSharedSecret(secretA);
+        javax.crypto.SecretKey aesKeyB = deriveAesKeyFromSharedSecret(secretB);
+
+        // 4. 같은 AES 키인지 확인 (encoded 비교)
+        boolean sameKey = java.util.Arrays.equals(
+                aesKeyA.getEncoded(), aesKeyB.getEncoded()
+        );
+        System.out.println("AES 키 동일? " + sameKey);
+
+        // 5. A가 메시지를 암호화, B가 복호화
+        String msg = "ECDH + HKDF + AES-GCM 정석 E2EE 테스트!";
+        EncryptedPayload payload = AesGcmUtil.encrypt(msg, aesKeyA);
+        String decrypted = AesGcmUtil.decrypt(payload, aesKeyB);
+
+        System.out.println("원문: " + msg);
+        System.out.println("복호화 결과: " + decrypted);
+    }
+
 }
