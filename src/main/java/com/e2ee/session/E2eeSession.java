@@ -36,4 +36,14 @@ public class E2eeSession {
         // 3) 세 값(내 키쌍, 상대 공개키, AES키)을 들고 있는 세션 객체를 만들어서 돌려줌
         return new E2eeSession(myKeyPair, theirPublicKey, aesKey);
     }
+
+    // 이 세션의 AES 키로 문자열 암호화
+    public EncryptedPayload encrypt(String plaintext) throws Exception {
+        return AesGcmUtil.encrypt(plaintext, aesKey);
+    }
+
+    // 이 세션의 AES 키로 암호문 복호화
+    public String decrypt(EncryptedPayload payload) throws Exception {
+        return AesGcmUtil.decrypt(payload, aesKey);
+    }
 }
