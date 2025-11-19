@@ -1,6 +1,7 @@
 package com.e2ee.protocol;
 
 import com.e2ee.crypto.EncryptedPayload;
+import com.e2ee.session.E2eeSession;
 
 /**
  * 서버와 클라이언트가 주고받는 공통 메시지 포맷.
@@ -54,5 +55,30 @@ public class ChatMessage {
 
     public String getTimestamp() {
         return timestamp;
+    }
+
+    /**
+     * 평문 문자열을 받아서, 주어진 E2eeSession으로 암호화한 CHAT 메시지를 생성한다.
+     */
+    public static ChatMessage encryptedChat(String sender,
+                                            String receiver,
+                                            String plaintext,
+                                            E2eeSession session,
+                                            String timestamp) throws Exception {
+
+        // 1) 평문을 세션의 AES 키로 암호화
+        EncryptedPayload payload = session.encrypt(plaintext);
+
+        // 2) EncryptedPayload를 문자열 1개로 포장
+        String body = payload.toWireString();
+
+        // 3) CHAT 타입 메시지 생성
+        return new ChatMessage(
+                MessageType.CHAT,
+                sender,
+                receiver,
+                body,
+                timestamp
+        );
     }
 }
