@@ -98,4 +98,5 @@ public class ChatMessage {
         // 2) 세션의 AES 키로 복호화
         return session.decrypt(payload);
     }
+
 }
