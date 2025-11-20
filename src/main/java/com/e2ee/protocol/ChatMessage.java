@@ -2,7 +2,7 @@ package com.e2ee.protocol;
 
 import com.e2ee.crypto.EncryptedPayload;
 import com.e2ee.session.E2eeSession;
-import com.e2ee.crypto.EcdhUtil;   // ★ 이 줄 추가
+import com.e2ee.crypto.EcdhUtil;
 
 
 import java.security.PublicKey;
@@ -59,6 +59,27 @@ public class ChatMessage {
         );
     }
 
+    // 키 교환 응답 메시지 만들기 (KEY_RES)
+    public static ChatMessage keyResponse(String sender,
+                                          String receiver,
+                                          java.security.PublicKey myPublicKey,
+                                          String timestamp) {
+
+        String pubKeyBase64 = com.e2ee.crypto.EcdhUtil.encodePublicKey(myPublicKey);
+
+        return new ChatMessage(
+                MessageType.KEY_RES,
+                sender,
+                receiver,
+                pubKeyBase64,
+                timestamp
+        );
+    }
+
+    // body에 들어있는 Base64 공개키를 PublicKey 객체로 복원
+    public java.security.PublicKey extractPeerPublicKey() throws Exception {
+        return com.e2ee.crypto.EcdhUtil.decodePublicKey(this.body);
+    }
 
     public MessageType getType() {
         return type;
