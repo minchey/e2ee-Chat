@@ -3,6 +3,8 @@ package com.e2ee.client;
 import com.e2ee.crypto.EncryptedPayload;
 import com.e2ee.crypto.EcdhUtil;
 import com.e2ee.crypto.AesGcmUtil;
+import com.e2ee.protocol.ChatMessage;
+import com.e2ee.protocol.JsonUtil;
 
 import java.security.KeyPair;
 import java.util.Scanner;
@@ -69,7 +71,19 @@ public class ClientMain {
             }
             if (line.startsWith("/key ")) {
                 String target = line.substring(5).trim(); // 예: /key foo#0001
-                System.out.println("[DEBUG] /key 명령 입력됨. 대상: " + target);
+                // 1) KEY_REQ 메시지 객체 만들기
+                ChatMessage keyReq = ChatMessage.keyRequest(
+                        userTag,                  // sender: 나 (id#0001 형태)
+                        target,                   // receiver: 상대 id#xxxx
+                        myKeyPair.getPublic(),    // 내 공개키
+                        "2025-11-19T00:00:00"     // 임시 timestamp (나중에 LocalDateTime로 바꿀 수 있음)
+                );
+                // 2) JSON 문자열로 변환
+                String json = JsonUtil.toJson(keyReq);
+
+                // 3) 콘솔에 출력 (나중엔 이걸 서버에 보내게 됨)
+                System.out.println("[SEND] " + json);
+
             } else if (line.startsWith("/history ")) {
                 String target = line.substring(9).trim(); // 예: /history foo#0001
                 System.out.println("[DEBUG] /history 명령 입력됨. 대상: " + target);

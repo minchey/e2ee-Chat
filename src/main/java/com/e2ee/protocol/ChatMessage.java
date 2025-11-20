@@ -2,6 +2,10 @@ package com.e2ee.protocol;
 
 import com.e2ee.crypto.EncryptedPayload;
 import com.e2ee.session.E2eeSession;
+import com.e2ee.crypto.EcdhUtil;   // ★ 이 줄 추가
+
+
+import java.security.PublicKey;
 
 /**
  * 서버와 클라이언트가 주고받는 공통 메시지 포맷.
@@ -34,6 +38,25 @@ public class ChatMessage {
         this.receiver = receiver;
         this.body = body;
         this.timestamp = timestamp;
+    }
+
+    // 키 교환 요청 메시지 만들기 (KEY_REQ)
+    public static ChatMessage keyRequest(String sender,
+                                         String receiver,
+                                         PublicKey myPublicKey,
+                                         String timestamp) {
+
+        // 내 공개키를 Base64 문자열로 바꿈
+        String pubKeyBase64 = EcdhUtil.encodePublicKey(myPublicKey);
+
+        // body에 공개키 문자열을 넣어서 ChatMessage 만들어서 돌려줌
+        return new ChatMessage(
+                MessageType.KEY_REQ,
+                sender,
+                receiver,
+                pubKeyBase64,
+                timestamp
+        );
     }
 
 

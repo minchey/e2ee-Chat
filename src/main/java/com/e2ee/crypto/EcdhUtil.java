@@ -9,6 +9,9 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.KeyFactory;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 
 public class EcdhUtil {
 
@@ -109,6 +112,22 @@ public class EcdhUtil {
         }
         return okm;
     }
+    // === 공개키 <-> Base64 문자열 변환 ===
+
+    // PublicKey -> Base64 문자열
+    public static String encodePublicKey(PublicKey publicKey) {
+        byte[] encoded = publicKey.getEncoded();                 // 공개키 바이트 배열
+        return Base64.getEncoder().encodeToString(encoded);      // Base64 문자열로 변환
+    }
+
+    // Base64 문자열 -> PublicKey
+    public static PublicKey decodePublicKey(String base64) throws Exception {
+        byte[] encoded = Base64.getDecoder().decode(base64);
+        X509EncodedKeySpec spec = new X509EncodedKeySpec(encoded);
+        KeyFactory kf = KeyFactory.getInstance("X25519");
+        return kf.generatePublic(spec);
+    }
+
     public static void main(String[] args) throws Exception {
         // 1. A와 B 각각 X25519 키쌍 생성
         java.security.KeyPair a = generateKeyPair();
