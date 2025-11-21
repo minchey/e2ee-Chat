@@ -5,6 +5,7 @@ import com.e2ee.crypto.EcdhUtil;
 import com.e2ee.crypto.AesGcmUtil;
 import com.e2ee.protocol.ChatMessage;
 import com.e2ee.protocol.JsonUtil;
+import com.e2ee.protocol.MessageType;
 
 import java.security.KeyPair;
 import java.util.Scanner;
@@ -88,8 +89,23 @@ public class ClientMain {
                 String target = line.substring(9).trim(); // 예: /history foo#0001
                 System.out.println("[DEBUG] /history 명령 입력됨. 대상: " + target);
             } else {
-                // 일반 채팅 메시지
-                System.out.println("[INFO] 일반 메시지 입력됨: " + line);
+                // 일반 채팅 메시지라고 가정
+                String target = "ALL"; // 일단은 전체방으로 보내는 느낌 (나중에 상대 ID로 바꿀 수 있음)
+
+                // 1) CHAT 타입 메시지 객체 만들기
+                ChatMessage chat = new ChatMessage(
+                        MessageType.CHAT,   // 타입
+                        userTag,            // sender: 내 아이디#태그
+                        target,             // receiver: 지금은 "ALL"
+                        line,               // body: 아직은 평문
+                        "2025-11-21T00:00:00" // 임시 타임스탬프
+                );
+
+                // 2) JSON 문자열로 변환
+                String json = JsonUtil.toJson(chat);
+
+                // 3) 콘솔에 출력 (나중엔 이걸 서버에 보낼 거야)
+                System.out.println("[SEND] " + json);
             }
         }
     }
