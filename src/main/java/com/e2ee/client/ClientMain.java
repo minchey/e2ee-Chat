@@ -6,9 +6,13 @@ import com.e2ee.crypto.AesGcmUtil;
 import com.e2ee.protocol.ChatMessage;
 import com.e2ee.protocol.JsonUtil;
 import com.e2ee.protocol.MessageType;
+import com.e2ee.session.E2eeSession;
 
 import java.security.KeyPair;
+import java.util.Map;
 import java.util.Scanner;
+
+import static com.e2ee.protocol.JsonUtil.toJson;
 
 public class ClientMain {
 
@@ -61,6 +65,9 @@ public class ClientMain {
         KeyPair myKeyPair = EcdhUtil.generateKeyPair();
         System.out.println("[OK] 키쌍 생성 완료! 이제 이 키로 세션을 만들 수 있습니다.");
 
+        // ★ 상대별 세션을 저장할 Map (상대 userTag -> E2eeSession)
+        Map<String, E2eeSession> sessions = new java.util.HashMap<>();
+
         // (3) 이제부터는 콘솔 명령 루프
         while (true) {
             System.out.println("> ");
@@ -80,7 +87,7 @@ public class ClientMain {
                         "2025-11-19T00:00:00"     // 임시 timestamp (나중에 LocalDateTime로 바꿀 수 있음)
                 );
                 // 2) JSON 문자열로 변환
-                String json = JsonUtil.toJson(keyReq);
+                String json = toJson(keyReq);
 
                 // 3) 콘솔에 출력 (나중엔 이걸 서버에 보내게 됨)
                 System.out.println("[SEND] " + json);
@@ -89,22 +96,36 @@ public class ClientMain {
                 String target = line.substring(9).trim(); // 예: /history foo#0001
                 System.out.println("[DEBUG] /history 명령 입력됨. 대상: " + target);
             } else {
-                // 일반 채팅 메시지라고 가정
-                String target = "ALL"; // 일단은 전체방으로 보내는 느낌 (나중에 상대 ID로 바꿀 수 있음)
+                // 일반 채팅 메시지
+                String target = "ALL"; // 일단은 전체방 (나중에 상대 userTag로 바꿀 수 있음)
+                String timestamp = "2025-11-21T00:00:00"; // 임시 시간 문자열
 
-                // 1) CHAT 타입 메시지 객체 만들기
-                ChatMessage chat = new ChatMessage(
-                        MessageType.CHAT,   // 타입
-                        userTag,            // sender: 내 아이디#태그
-                        target,             // receiver: 지금은 "ALL"
-                        line,               // body: 아직은 평문
-                        "2025-11-21T00:00:00" // 임시 타임스탬프
-                );
+                E2eeSession session = sessions.get(target);
+                ChatMessage chat;
 
-                // 2) JSON 문자열로 변환
-                String json = JsonUtil.toJson(chat);
+                if (session == null) {
+                    // 아직 target과의 세션이 없으면 "그냥 평문"으로 보냄 (임시)
+                    chat = new ChatMessage(
+                            MessageType.CHAT,
+                            userTag,
+                            target,
+                            line,      // body = 평문
+                            timestamp
+                    );
+                    System.out.println("[WARN] " + target + " 과의 세션이 없어, 일단 평문으로 보냅니다(임시).");
+                } else {
+                    // 세션이 있으면 암호화해서 CHAT 메시지 생성
+                    chat = ChatMessage.encryptedChat(
+                            userTag,
+                            target,
+                            line,      // 평문
+                            session,   // 여기서 내부적으로 encrypt() 호출
+                            timestamp
+                    );
+                    System.out.println("[INFO] " + target + " 과의 E2EE 세션 사용해서 암호화했습니다.");
+                }
 
-                // 3) 콘솔에 출력 (나중엔 이걸 서버에 보낼 거야)
+                String json = toJson(chat);
                 System.out.println("[SEND] " + json);
             }
         }
