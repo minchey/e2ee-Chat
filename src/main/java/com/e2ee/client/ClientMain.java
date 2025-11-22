@@ -68,6 +68,19 @@ public class ClientMain {
         // ★ 상대별 세션을 저장할 Map (상대 userTag -> E2eeSession)
         Map<String, E2eeSession> sessions = new java.util.HashMap<>();
 
+        // ===== 테스트용: 서버/상대가 세션을 이미 만들어줬다고 "가정" =====
+// 1) 상대 키쌍 하나 더 만든다 (진짜로는 다른 클라이언트가 가진 키라고 생각하면 됨)
+        KeyPair peerKeyPair = EcdhUtil.generateKeyPair();
+
+// 2) "ALL" 이라는 상대와의 세션을 미리 만든다
+        E2eeSession testSession = E2eeSession.create(myKeyPair, peerKeyPair.getPublic());
+
+// 3) target = "ALL" 에 대해 세션을 등록해둔다
+        sessions.put("ALL", testSession);
+
+        System.out.println("[DEBUG] 테스트용 세션을 'ALL' 이라는 상대 이름으로 등록했습니다.");
+        System.out.println("[DEBUG] 이제 일반 메시지를 치면 E2EE 암호화 분기가 실행될 거예요.");
+
         // (3) 이제부터는 콘솔 명령 루프
         while (true) {
             System.out.println("> ");
