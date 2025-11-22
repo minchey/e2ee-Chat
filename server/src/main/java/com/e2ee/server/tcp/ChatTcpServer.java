@@ -5,6 +5,8 @@ import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
 
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -38,6 +40,12 @@ public class ChatTcpServer {
                             new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8)
                     );
 
+                    // ★ 추가: 이 클라이언트에게 보낼 출력 스트림
+                    PrintWriter out = new PrintWriter(
+                            new OutputStreamWriter(client.getOutputStream(), StandardCharsets.UTF_8),
+                            true // println 할 때마다 자동 flush
+                    );
+
                     String line;
                     while ((line = br.readLine()) != null) {
                         System.out.println("[서버] RAW: " + line);
@@ -50,10 +58,33 @@ public class ChatTcpServer {
                             System.out.println("[서버][KEY_REQ] from=" + msg.getSender()
                                     + " to=" + msg.getReceiver()
                                     + ", body(공개키 Base64)=" + msg.getBody());
+
+                            // ★ 테스트용 응답: 그냥 SYSTEM 메시지로 "KEY_REQ 잘 받음" 보내기
+                            ChatMessage res = new ChatMessage(
+                                    MessageType.SYSTEM,
+                                    "server",                  // sender
+                                    msg.getSender(),           // receiver
+                                    "KEY_REQ_OK",              // body
+                                    msg.getTimestamp()         // 일단 같은 시간 재사용
+                            );
+
+                            String json = gson.toJson(res);
+                            out.println(json);                 // ← 클라이언트로 전송
+
                         } else if (msg.getType() == MessageType.CHAT) {
                             System.out.println("[ 서버 ][CHAT] " + msg.getSender()
                                     + " -> " + msg.getReceiver()
                                     + " : " + msg.getBody());
+                            // CHAT도 그냥 echo처럼 돌려보내보기
+                            ChatMessage echo = new ChatMessage(
+                                    MessageType.SYSTEM,
+                                    "server",
+                                    msg.getSender(),
+                                    "CHAT_RECEIVED: " + msg.getBody(),
+                                    msg.getTimestamp()
+                            );
+                            String json = gson.toJson(echo);
+                            out.println(json);
                         } else {
                             System.out.println("[서버] 알 수 없는 타입: " + msg.getType());
                         }
