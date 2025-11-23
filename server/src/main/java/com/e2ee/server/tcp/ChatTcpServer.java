@@ -1,8 +1,10 @@
 package com.e2ee.server.tcp;
 
+import com.e2ee.server.crypto.EcdhUtil;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
+
 
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -10,6 +12,7 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
 
 import com.e2ee.server.protocol.ChatMessage;
 import com.e2ee.server.protocol.MessageType;
@@ -23,6 +26,15 @@ public class ChatTcpServer {
 
     private final Gson gson = new Gson();  // ★ JSON <-> 객체 변환용
 
+    private KeyPair serverKeyPair;
+
+
+
+
+    @PostConstruct
+    public void init() throws Exception {
+        serverKeyPair = EcdhUtil.generateKeyPair();
+    }
 
     @PostConstruct   // 스프링이 뜰 때 함께 실행해줘!
     public void start(){
