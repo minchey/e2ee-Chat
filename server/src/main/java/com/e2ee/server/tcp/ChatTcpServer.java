@@ -67,23 +67,29 @@ public class ChatTcpServer {
 
                         // 2) type에 따라 분기
                         if (msg.getType() == MessageType.KEY_REQ) {
+
                             System.out.println("[서버][KEY_REQ] from=" + msg.getSender()
                                     + " to=" + msg.getReceiver()
                                     + ", body(공개키 Base64)=" + msg.getBody());
 
-                            // ★ 테스트용 응답: 그냥 SYSTEM 메시지로 "KEY_REQ 잘 받음" 보내기
+                            // ★ 1) 서버 공개키 Base64 만들기
+                            String serverPubKeyBase64 =
+                                    EcdhUtil.encodePublicKey(serverKeyPair.getPublic());
+
+                            // ★ 2) KEY_RES 메시지 생성
                             ChatMessage res = new ChatMessage(
-                                    MessageType.SYSTEM,
-                                    "server",                  // sender
-                                    msg.getSender(),           // receiver
-                                    "KEY_REQ_OK",              // body
-                                    msg.getTimestamp()         // 일단 같은 시간 재사용
+                                    MessageType.KEY_RES,      // 응답 타입
+                                    "server",                 // 보낸사람
+                                    msg.getSender(),          // 받는사람 (요청자)
+                                    serverPubKeyBase64,       // body = 서버 공개키 Base64
+                                    msg.getTimestamp()
                             );
 
+                            // ★ 3) JSON으로 변환하여 보내기
                             String json = gson.toJson(res);
-                            out.println(json);                 // ← 클라이언트로 전송
-
-                        } else if (msg.getType() == MessageType.CHAT) {
+                            out.println(json);
+                        }
+                        else if (msg.getType() == MessageType.CHAT) {
                             System.out.println("[ 서버 ][CHAT] " + msg.getSender()
                                     + " -> " + msg.getReceiver()
                                     + " : " + msg.getBody());
