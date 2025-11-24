@@ -30,6 +30,8 @@ public class ClientMain {
 
         Scanner sc = new Scanner(System.in);
 
+        myKeyPair = EcdhUtil.generateKeyPair();
+
 
         // ==== 0) 서버 먼저 연결 ====
         System.out.println("[NET] 서버에 접속 시도 중...");
