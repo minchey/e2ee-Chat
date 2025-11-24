@@ -12,6 +12,8 @@ import java.net.Socket;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 import java.security.KeyPair;
@@ -21,6 +23,8 @@ import java.util.Scanner;
 import static com.e2ee.protocol.JsonUtil.toJson;
 
 public class ClientMain {
+    private static KeyPair myKeyPair;
+    private static Map<String, E2eeSession> sessions = new java.util.HashMap<>();
 
     public static void main(String[] args) throws Exception {
 
@@ -37,6 +41,52 @@ public class ClientMain {
                 new OutputStreamWriter(out, StandardCharsets.UTF_8),
                 true   // println() 할 때마다 자동 flush
         );
+
+        // ★ 서버에서 오는 메시지를 읽을 reader + 쓰레드
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8)
+        );
+
+        Thread recvThread = new Thread(() -> {
+            try {
+                String line;
+                while ((line = reader.readLine()) != null) {
+
+                    // 1) JSON → ChatMessage 객체로 변환
+                    ChatMessage msg = JsonUtil.fromJson(line, ChatMessage.class);
+
+                    // 2) 타입에 따라 다르게 출력
+                    if (msg.getType() == MessageType.SYSTEM) {
+                        System.out.println("[SERVER] " + msg.getBody());
+                    } else if (msg.getType() == MessageType.KEY_RES) {
+                        System.out.println("[KEY_RES] from=" + msg.getSender()
+                                + " body=" + msg.getBody());
+                        // 1) 서버 공개키 복원
+                        java.security.PublicKey serverPub =
+                                EcdhUtil.decodePublicKey(msg.getBody());
+
+                        // 2) E2EE 세션 생성 (공유비밀 → AES키까지 내부에서 해줌)
+                        E2eeSession session = E2eeSession.create(myKeyPair, serverPub);
+
+                        // 3) 세션을 Map에 저장
+                        sessions.put("ALL", session);   // 지금은 ALL 방과의 세션으로 저장
+
+                        System.out.println("[INFO] 서버와 E2EE 세션 생성 완료! 이제부터 ALL은 암호화해서 보냄.");                    } else if (msg.getType() == MessageType.CHAT) {
+                        System.out.println("[CHAT] " + msg.getSender()
+                                + " -> " + msg.getReceiver()
+                                + " : " + msg.getBody());
+                    } else {
+                        System.out.println("[FROM SERVER RAW] " + line);
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[RECV] 서버와의 연결이 끊어졌습니다.");
+            }
+        }, "recv-thread");
+
+
+        recvThread.setDaemon(true);
+        recvThread.start();
         //여기까지
 
 
