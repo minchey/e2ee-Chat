@@ -93,14 +93,16 @@ public class ChatTcpServer {
                             System.out.println("[ 서버 ][CHAT] " + msg.getSender()
                                     + " -> " + msg.getReceiver()
                                     + " : " + msg.getBody());
-                            // CHAT도 그냥 echo처럼 돌려보내보기
+
+                            // 서버는 암호문을 그냥 통과시켜 주는 역할만!
                             ChatMessage echo = new ChatMessage(
-                                    MessageType.SYSTEM,
-                                    "server",
-                                    msg.getSender(),
-                                    "CHAT_RECEIVED: " + msg.getBody(),
+                                    MessageType.CHAT,      // ★ SYSTEM 말고 CHAT으로!
+                                    msg.getSender(),       // 원래 보낸 사람
+                                    msg.getReceiver(),     // 원래 받는 사람
+                                    msg.getBody(),         // 암호문 그대로
                                     msg.getTimestamp()
                             );
+
                             String json = gson.toJson(echo);
                             out.println(json);
                         } else {
