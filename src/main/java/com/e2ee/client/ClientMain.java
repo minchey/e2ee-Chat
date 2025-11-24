@@ -24,7 +24,8 @@ import static com.e2ee.protocol.JsonUtil.toJson;
 
 public class ClientMain {
     private static KeyPair myKeyPair;
-    private static Map<String, E2eeSession> sessions = new java.util.HashMap<>();
+    //private static Map<String, E2eeSession> sessions = new java.util.HashMap<>();
+    private static final String ROOM_ALL = "ALL";
 
     public static void main(String[] args) throws Exception {
 
@@ -48,10 +49,14 @@ public class ClientMain {
         BufferedReader reader = new BufferedReader(
                 new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8)
         );
+        // ★ 상대별 세션을 저장할 Map (상대 userTag -> E2eeSession)
+        Map<String, E2eeSession> sessions = new java.util.HashMap<>();
 
         Thread recvThread = new Thread(() -> {
+
             try {
                 String line;
+
                 while ((line = reader.readLine()) != null) {
 
                     // 1) JSON → ChatMessage 객체로 변환
@@ -71,13 +76,34 @@ public class ClientMain {
                         E2eeSession session = E2eeSession.create(myKeyPair, serverPub);
 
                         // 3) 세션을 Map에 저장
-                        sessions.put("ALL", session);   // 지금은 ALL 방과의 세션으로 저장
+                        sessions.put(ROOM_ALL, session);   // 지금은 ALL 방과의 세션으로 저장
 
                         System.out.println("[INFO] 서버와 E2EE 세션 생성 완료! 이제부터 ALL은 암호화해서 보냄.");                    } else if (msg.getType() == MessageType.CHAT) {
                         System.out.println("[CHAT] " + msg.getSender()
                                 + " -> " + msg.getReceiver()
                                 + " : " + msg.getBody());
-                    } else {
+                    } else if (msg.getType() == MessageType.CHAT) {
+
+                        // 1) 세션 찾기 (지금은 ALL 방만 사용)
+                        E2eeSession session = sessions.get("ALL");
+
+                        if (session == null) {
+                            // 아직 세션 없으면 그냥 원문(암호문)을 보여주자
+                            System.out.println("[CHAT:RAW] " + msg.getSender()
+                                    + " : " + msg.getBody());
+                        } else {
+                            // 2) body(Base64 문자열) → EncryptedPayload
+                            EncryptedPayload payload =
+                                    EncryptedPayload.fromWireString(msg.getBody());
+
+                            // 3) 세션으로 복호화
+                            String plain = session.decrypt(payload);
+
+                            // 4) 사람 눈에 보이는 평문 출력
+                            System.out.println("[CHAT] " + msg.getSender()
+                                    + " : " + plain);
+                        }
+                    }else {
                         System.out.println("[FROM SERVER RAW] " + line);
                     }
                 }
@@ -137,8 +163,7 @@ public class ClientMain {
         KeyPair myKeyPair = EcdhUtil.generateKeyPair();
         System.out.println("[OK] 키쌍 생성 완료! 이제 이 키로 세션을 만들 수 있습니다.");
 
-        // ★ 상대별 세션을 저장할 Map (상대 userTag -> E2eeSession)
-        Map<String, E2eeSession> sessions = new java.util.HashMap<>();
+
 
 
         // (3) 이제부터는 콘솔 명령 루프
@@ -173,7 +198,7 @@ public class ClientMain {
                 System.out.println("[DEBUG] /history 명령 입력됨. 대상: " + target);
             } else {
                 // 일반 채팅 메시지
-                String target = "ALL"; // 일단은 전체방 (나중에 상대 userTag로 바꿀 수 있음)
+                String target = ROOM_ALL; // 일단은 전체방 (나중에 상대 userTag로 바꿀 수 있음)
                 String timestamp = "2025-11-21T00:00:00"; // 임시 시간 문자열
 
                 E2eeSession session = sessions.get(target);
