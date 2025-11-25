@@ -84,23 +84,24 @@ public class ClientMain {
                                 + " : " + msg.getBody());
                     } else if (msg.getType() == MessageType.CHAT) {
 
-                        // 1) 세션 찾기 (지금은 ALL 방만 사용)
-                        E2eeSession session = sessions.get("ALL");
+                        // 1) 일단 ALL 방 세션을 꺼낸다 (지금은 ALL만 사용)
+                        E2eeSession session = sessions.get(ROOM_ALL);
 
                         if (session == null) {
-                            // 아직 세션 없으면 그냥 원문(암호문)을 보여주자
+                            // 아직 세션 없으면, 암호문이든 평문이든 그냥 RAW로 보여주기
                             System.out.println("[CHAT:RAW] " + msg.getSender()
+                                    + " -> " + msg.getReceiver()
                                     + " : " + msg.getBody());
                         } else {
-                            // 2) body(Base64 문자열) → EncryptedPayload
-                            EncryptedPayload payload =
-                                    EncryptedPayload.fromWireString(msg.getBody());
+                            // 2) body(Base64 문자열) -> EncryptedPayload
+                            EncryptedPayload payload = EncryptedPayload.fromWireString(msg.getBody());
 
                             // 3) 세션으로 복호화
                             String plain = session.decrypt(payload);
 
-                            // 4) 사람 눈에 보이는 평문 출력
+                            // 4) 사람이 보는 평문 출력
                             System.out.println("[CHAT] " + msg.getSender()
+                                    + " -> " + msg.getReceiver()
                                     + " : " + plain);
                         }
                     }else {
