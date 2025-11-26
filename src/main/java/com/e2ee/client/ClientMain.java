@@ -78,10 +78,7 @@ public class ClientMain {
                         // 3) 세션을 Map에 저장
                         sessions.put(ROOM_ALL, session);   // 지금은 ALL 방과의 세션으로 저장
 
-                        System.out.println("[INFO] 서버와 E2EE 세션 생성 완료! 이제부터 ALL은 암호화해서 보냄.");                    } else if (msg.getType() == MessageType.CHAT) {
-                        System.out.println("[CHAT] " + msg.getSender()
-                                + " -> " + msg.getReceiver()
-                                + " : " + msg.getBody());
+                        System.out.println("[INFO] 서버와 E2EE 세션 생성 완료! 이제부터 ALL은 암호화해서 보냄.");
                     } else if (msg.getType() == MessageType.CHAT) {
 
                         // 1) 일단 ALL 방 세션을 꺼낸다 (지금은 ALL만 사용)
