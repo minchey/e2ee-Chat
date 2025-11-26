@@ -27,6 +27,10 @@ public class ClientMain {
     // 🔑 이 클라이언트가 ECDH용으로 사용할 개인키/공개키 쌍 (프로그램 동안 고정)
     private static KeyPair myKeyPair;
 
+    // 지금 내가 대화하려는 상대 (예: "foo#0001")
+    // 기본값은 null → /key 치기 전에는 세션 없음
+    private static String currentTarget = null;
+
     // 🔐 상대와의 E2EE 세션을 저장 (지금은 "ALL" 방 하나만 사용)
     private static final Map<String, E2eeSession> sessions = new HashMap<>();
 
@@ -179,15 +183,19 @@ public class ClientMain {
                         // 2) E2EE 세션 생성 (공유비밀 → AES키까지 내부에서 해줌)
                         E2eeSession session = E2eeSession.create(myKeyPair, serverPub);
 
-                        // 3) 세션을 Map에 저장 (지금은 ALL 방 1개)
-                        sessions.put(ROOM_ALL, session);
-
-                        System.out.println("[INFO] 서버와 E2EE 세션 생성 완료! 이제부터 ALL은 암호화해서 보냄.");
+                        // ★ ALL이 아니라, currentTarget 기준으로 저장
+                        if (currentTarget != null) {
+                            sessions.put(currentTarget, session);
+                            System.out.println("[INFO] " + currentTarget + " 과의 E2EE 세션 생성 완료!");
+                        } else {
+                            System.out.println("[WARN] currentTarget 이 없어 세션을 저장하지 못했습니다.");
+                        }
 
                     } else if (msg.getType() == MessageType.CHAT) {
 
                         // CHAT 메시지 도착: 암호문일 수도, 평문일 수도 있다.
-                        E2eeSession session = sessions.get(ROOM_ALL);
+                        String target = msg.getReceiver(); // 이 메시지가 향하는 대상
+                        E2eeSession session = sessions.get(target);
 
                         if (session == null) {
                             // 아직 세션이 없으면 복호화를 못 하므로 RAW로 보여준다.
@@ -232,6 +240,9 @@ public class ClientMain {
                 // 예: /key ALL  또는 /key 상대아이디#0001
                 String target = line.substring(5).trim();
 
+                // ★ 지금부터 대화할 상대를 기록해 둔다
+                currentTarget = target;
+
                 ChatMessage keyReq = ChatMessage.keyRequest(
                         userTag,                  // sender: 나 (id#0001 형태)
                         target,                   // receiver: 상대 id#xxxx (서버가 해석)
@@ -251,8 +262,13 @@ public class ClientMain {
 
             } else {
                 // 일반 채팅 메시지
-                // 과제 조건에 맞게: /key로 세션을 만든 뒤에만 암호화해서 보낸다는 느낌
-                String target = ROOM_ALL; // 지금은 ALL 방만 사용
+
+                if (currentTarget == null) {
+                    System.out.println("[WARN] 아직 /key 로 상대를 지정하지 않았습니다. 먼저 /key 상대아이디 를 실행하세요.");
+                    continue;
+                }
+
+                String target = currentTarget;
                 String timestamp = "2025-11-21T00:00:00"; // 임시 시간
 
                 E2eeSession session = sessions.get(target);
