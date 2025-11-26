@@ -28,6 +28,9 @@ public class ChatTcpServer {
     // ★ JSON <-> 자바 객체 변환기 (Gson)
     private final Gson gson = new Gson();
 
+    // sender / receiver 로 쓰는 userTag -> 그 클라에게 보내는 출력 스트림
+    private final Map<String, PrintWriter> clientOutputs = new ConcurrentHashMap<>();
+
     // ★ 서버 자신의 ECDH 키쌍 (공개키/개인키)
     private KeyPair serverKeyPair;
 
@@ -97,22 +100,14 @@ public class ChatTcpServer {
                 // 1) JSON 문자열 → ChatMessage 객체
                 ChatMessage msg = gson.fromJson(line, ChatMessage.class);
 
-                // 2) 타입에 따라 분기 처리
-                if (msg.getType() == MessageType.AUTH_SIGNUP) {
-                    handleSignup(msg, out);
+                // ★ sender 기준으로 '이 소켓의 out' 을 등록해 둠
+                //    (최초 1번만 들어가고 이후에는 무시됨)
+                clientOutputs.putIfAbsent(msg.getSender(), out);
 
-                } else if (msg.getType() == MessageType.AUTH_LOGIN) {
-                    handleLogin(msg, out);
 
-                } else if (msg.getType() == MessageType.KEY_REQ) {
-                    handleKeyRequest(msg, out);
 
-                } else if (msg.getType() == MessageType.CHAT) {
-                    handleChatRelay(msg, out);
+                handleMessage(msg, out);
 
-                } else {
-                    System.out.println("[서버] 알 수 없는 타입: " + msg.getType());
-                }
             }
 
         } catch (Exception e) {
@@ -221,4 +216,52 @@ public class ChatTcpServer {
 
         out.println(gson.toJson(echo));
     }
+
+    private void handleMessage(ChatMessage msg, PrintWriter out) {
+
+        if (msg.getType() == MessageType.AUTH_SIGNUP) {
+            handleSignup(msg, out);
+
+        } else if (msg.getType() == MessageType.AUTH_LOGIN) {
+            handleLogin(msg, out);
+
+        } else if (msg.getType() == MessageType.KEY_REQ) {
+            handleKeyRequest(msg, out);
+
+        } else if (msg.getType() == MessageType.CHAT) {
+            handleChatRelay(msg, out);
+            // ★ 여기서부턴 '라우팅'이 핵심
+            System.out.println("[ 서버 ][CHAT] " + msg.getSender()
+                    + " -> " + msg.getReceiver()
+                    + " : " + msg.getBody());
+
+            String json = gson.toJson(msg); // 내용 안 바꾸고 그대로 전달
+
+            if ("ALL".equalsIgnoreCase(msg.getReceiver())) {
+                // 1) 전체에게 브로드캐스트
+                for (PrintWriter w : clientOutputs.values()) {
+                    w.println(json);
+                }
+            } else {
+                // 2) 특정 유저에게만 보내기
+                PrintWriter targetOut = clientOutputs.get(msg.getReceiver());
+                if (targetOut != null) {
+                    targetOut.println(json);
+                } else {
+                    // 상대가 접속 안 해 있으면, 보낸 사람에게만 안내 메시지 전송 (선택)
+                    ChatMessage warn = new ChatMessage(
+                            MessageType.SYSTEM,
+                            "server",
+                            msg.getSender(),
+                            "TARGET_OFFLINE:" + msg.getReceiver(),
+                            msg.getTimestamp()
+                    );
+                    out.println(gson.toJson(warn));
+                }
+            }
+        } else {
+            System.out.println("[서버] 알 수 없는 타입: " + msg.getType());
+        }
+    }
+
 }
