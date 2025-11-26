@@ -1,6 +1,7 @@
 package com.e2ee.server.tcp;
 
 import com.e2ee.server.crypto.EcdhUtil;
+import com.e2ee.server.protocol.AuthPayload;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
@@ -13,6 +14,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 
 import com.e2ee.server.protocol.ChatMessage;
 import com.e2ee.server.protocol.MessageType;
@@ -28,6 +32,9 @@ public class ChatTcpServer {
 
     private KeyPair serverKeyPair;
 
+
+    // 간단한 유저 저장소 (id -> password)
+    private final Map<String, String> users = new ConcurrentHashMap<>();
 
 
 
@@ -66,6 +73,58 @@ public class ChatTcpServer {
                         ChatMessage msg = gson.fromJson(line, ChatMessage.class);
 
                         // 2) type에 따라 분기
+                        if (msg.getType() == MessageType.AUTH_SIGNUP) {
+
+                            // body: {"id":"aaa","password":"1111"} 형태라고 가정
+                            AuthPayload p = gson.fromJson(msg.getBody(), AuthPayload.class);
+
+                            String id = p.getId();
+                            String pw = p.getPassword();
+
+                            String result;
+                            if (users.containsKey(id)) {
+                                result = "SIGNUP_FAIL:ID_ALREADY_EXISTS";
+                            } else {
+                                users.put(id, pw);
+                                result = "SIGNUP_OK";
+                                System.out.println("[AUTH] 새 회원가입: " + id);
+                            }
+
+                            ChatMessage res = new ChatMessage(
+                                    MessageType.AUTH_RESULT,
+                                    "server",
+                                    msg.getSender(),   // 클라 id
+                                    result,            // body: 결과 문자열
+                                    msg.getTimestamp()
+                            );
+                            out.println(gson.toJson(res));
+
+                        } else if (msg.getType() == MessageType.AUTH_LOGIN) {
+
+                            AuthPayload p = gson.fromJson(msg.getBody(), AuthPayload.class);
+                            String id = p.getId();
+                            String pw = p.getPassword();
+
+                            String result;
+                            if (!users.containsKey(id)) {
+                                result = "LOGIN_FAIL:ID_NOT_FOUND";
+                            } else if (!users.get(id).equals(pw)) {
+                                result = "LOGIN_FAIL:BAD_PASSWORD";
+                            } else {
+                                result = "LOGIN_OK";
+                                System.out.println("[AUTH] 로그인 성공: " + id);
+                            }
+
+                            ChatMessage res = new ChatMessage(
+                                    MessageType.AUTH_RESULT,
+                                    "server",
+                                    msg.getSender(),
+                                    result,
+                                    msg.getTimestamp()
+                            );
+                            out.println(gson.toJson(res));
+                        }
+
                         if (msg.getType() == MessageType.KEY_REQ) {
 
                             System.out.println("[서버][KEY_REQ] from=" + msg.getSender()
