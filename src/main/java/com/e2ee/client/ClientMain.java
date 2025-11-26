@@ -101,7 +101,7 @@ public class ClientMain {
                                     + " -> " + msg.getReceiver()
                                     + " : " + plain);
                         }
-                    }else {
+                    } else {
                         System.out.println("[FROM SERVER RAW] " + line);
                     }
                 }
@@ -160,8 +160,6 @@ public class ClientMain {
         System.out.println("[INFO] ECDH 키쌍 생성 중...");
         KeyPair myKeyPair = EcdhUtil.generateKeyPair();
         System.out.println("[OK] 키쌍 생성 완료! 이제 이 키로 세션을 만들 수 있습니다.");
-
-
 
 
         // (3) 이제부터는 콘솔 명령 루프

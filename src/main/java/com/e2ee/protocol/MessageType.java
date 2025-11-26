@@ -9,5 +9,8 @@ public enum MessageType {
     CHAT,       // 일반 채팅 메시지
     KEY_REQ,    // 공개키 / 세션키 교환 요청
     KEY_RES,    // 공개키 / 세션키 교환 응답
-    SYSTEM      // 시스템 알림(서버 공지 등)
+    SYSTEM,     // 시스템 알림(서버 공지 등)
+    AUTH_SIGNUP,   // 회원가입 요청
+    AUTH_LOGIN,    // 로그인 요청
+    AUTH_RESULT    // 회원가입/로그인 결과
 }
