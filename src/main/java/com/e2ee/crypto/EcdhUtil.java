@@ -158,4 +158,16 @@ public class EcdhUtil {
         System.out.println("복호화 결과: " + decrypted);
     }
 
+    // ★ 추가: PrivateKey + PublicKey → SecretKey 한 번에 만드는 헬퍼 함수
+    public static SecretKey deriveAesKeyFromSharedSecret(
+            PrivateKey myPrivate, PublicKey theirPublic) throws Exception {
+
+        // 1) 공유 비밀 생성
+        byte[] sharedSecret = deriveSharedSecret(myPrivate, theirPublic);
+
+        // 2) 공유 비밀로부터 AES 키 생성
+        return deriveAesKeyFromSharedSecret(sharedSecret);
+    }
+
+
 }
