@@ -38,18 +38,9 @@ public class ChatTcpServer {
     //    key: 아이디, value: 비밀번호
     private final Map<String, String> users = new ConcurrentHashMap<>();
 
-    // ----------------------------------------------------
-    // 1) 서버 시작 준비: ECDH 키쌍 만들기
-    // ----------------------------------------------------
-    @PostConstruct
-    public void init() throws Exception {
-        // 서버가 사용할 X25519 키쌍 생성
-        serverKeyPair = EcdhUtil.generateKeyPair();
-        System.out.println("[INIT] 서버 ECDH 키쌍 생성 완료");
-    }
 
     // ----------------------------------------------------
-    // 2) 스프링이 뜰 때 TCP 서버 스레드 하나를 같이 올린다
+    // 1) 스프링이 뜰 때 TCP 서버 스레드 하나를 같이 올린다
     // ----------------------------------------------------
     @PostConstruct   // 스프링 부트가 시작될 때 자동으로 실행
     public void start() {
@@ -80,7 +71,7 @@ public class ChatTcpServer {
     }
 
     // ----------------------------------------------------
-    // 3) 실제 클라이언트 1명을 담당하는 메서드
+    // 2) 실제 클라이언트 1명을 담당하는 메서드
     //    - 여기서 AUTH / KEY_REQ / CHAT 등을 처리한다
     // ----------------------------------------------------
     private void handleClient(Socket client) {
