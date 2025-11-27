@@ -219,7 +219,7 @@ public class ChatTcpServer {
             handleLogin(msg, out);
 
         } else if (msg.getType() == MessageType.KEY_REQ) {
-            handleKeyRequest(msg, out);
+            handleKeyRequest(msg);
 
         } else if (msg.getType() == MessageType.CHAT) {
             handleChatRelay(msg, out);
