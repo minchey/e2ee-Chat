@@ -176,25 +176,18 @@ public class ChatTcpServer {
     // ----------------------------------------------------
     // 3-3) 키 교환 요청 처리 (KEY_REQ → KEY_RES)
     // ----------------------------------------------------
-    private void handleKeyRequest(ChatMessage msg, PrintWriter out) {
-        System.out.println("[서버][KEY_REQ] from=" + msg.getSender()
-                + " to=" + msg.getReceiver()
-                + ", body(공개키 Base64)=" + msg.getBody());
+    private void handleKeyRequest(ChatMessage msg) {
+        PrintWriter target = clientOutputs.get(msg.getReceiver());
+        if (target != null) {
+            target.println(gson.toJson(msg));
+        }
+    }
 
-        // 1) 서버 공개키를 Base64 문자열로 인코딩
-        String serverPubKeyBase64 =
-                EcdhUtil.encodePublicKey(serverKeyPair.getPublic());
-
-        // 2) 클라에게 KEY_RES 응답
-        ChatMessage res = new ChatMessage(
-                MessageType.KEY_RES,
-                "server",
-                msg.getSender(),        // 요청 보낸 클라이언트에게 돌려줌
-                serverPubKeyBase64,     // body = 서버 공개키(Base64)
-                msg.getTimestamp()
-        );
-
-        out.println(gson.toJson(res));
+    private void handleKeyResponse(ChatMessage msg) {
+        PrintWriter target = clientOutputs.get(msg.getReceiver());
+        if (target != null) {
+            target.println(gson.toJson(msg));
+        }
     }
 
     // ----------------------------------------------------
