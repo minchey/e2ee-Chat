@@ -98,7 +98,10 @@ public class ClientMain {
         pw = sc.nextLine();
 
         // 인증 요청 body
-        String authBody = "{\"id\":\"" + id + "\",\"password\":\"" + pw + "\"}";
+        String authBody =
+                "{\"id\":\"" + id + "\"," +
+                        "\"password\":\"" + pw + "\"," +
+                        "\"publicKey\":\"" + EcdhUtil.encodePublicKey(myPublicKey) + "\"}";
         String now = "2025-11-19T00:00:00";
 
         MessageType authType =
