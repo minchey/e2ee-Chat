@@ -139,24 +139,45 @@ public class ChatTcpServer {
 
 
 
-    // ============ 로그인 ============
+    // ----------------------------------------------------
+    // 3-2) 로그인 처리 (파일 기반 UserStore 사용)
+    // ----------------------------------------------------
     private void handleLogin(ChatMessage msg, PrintWriter out) {
 
         AuthPayload p = gson.fromJson(msg.getBody(), AuthPayload.class);
+
         String id = p.getId();
         String pw = p.getPassword();
 
-        String result;
+        if (!userStore.exists(id)) {
+            ChatMessage res = new ChatMessage(
+                    MessageType.AUTH_RESULT,
+                    "server",
+                    msg.getSender(),
+                    "LOGIN_FAIL:ID_NOT_FOUND",
+                    msg.getTimestamp()
+            );
+            out.println(gson.toJson(res));
+            return;
+        }
 
-        if (!userStore.exists(id)) result = "LOGIN_FAIL:ID_NOT_FOUND";
-        else if (!userStore.checkPassword(id, pw)) result = "LOGIN_FAIL:BAD_PASSWORD";
-        else result = "LOGIN_OK";
+        if (!userStore.checkPassword(id, pw)) {
+            ChatMessage res = new ChatMessage(
+                    MessageType.AUTH_RESULT,
+                    "server",
+                    msg.getSender(),
+                    "LOGIN_FAIL:BAD_PASSWORD",
+                    msg.getTimestamp()
+            );
+            out.println(gson.toJson(res));
+            return;
+        }
 
         ChatMessage res = new ChatMessage(
                 MessageType.AUTH_RESULT,
                 "server",
                 msg.getSender(),
-                result,
+                "LOGIN_OK",
                 msg.getTimestamp()
         );
 
