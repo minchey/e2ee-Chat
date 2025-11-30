@@ -93,4 +93,46 @@ public class AesGcmUtil {
         System.out.println("복호화 결과: " + decrypted);
     }
 
+    // ====== 4) byte[] 를 AES-GCM으로 암호화 (KeyVault용) ======
+    public static byte[] encryptBytes(byte[] rawBytes, String password) throws Exception {
+
+        // password → AES key로 파생 (간단 버전 PBKDF2)
+        SecretKey key = PasswordKey.deriveKey(password);
+
+        byte[] nonce = new byte[NONCE_LENGTH];
+        new SecureRandom().nextBytes(nonce);
+
+        Cipher cipher = Cipher.getInstance(ALGORITHM);
+        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, nonce);
+        cipher.init(Cipher.ENCRYPT_MODE, key, spec);
+
+        byte[] cipherBytes = cipher.doFinal(rawBytes);
+
+        // nonce와 cipher를 합쳐서 하나로 반환
+        byte[] result = new byte[nonce.length + cipherBytes.length];
+        System.arraycopy(nonce, 0, result, 0, nonce.length);
+        System.arraycopy(cipherBytes, 0, result, nonce.length, cipherBytes.length);
+
+        return result;
+    }
+
+    // ====== 5) byte[] AES-GCM 복호화 ======
+    public static byte[] decryptBytes(byte[] encrypted, String password) throws Exception {
+
+        SecretKey key = PasswordKey.deriveKey(password);
+
+        byte[] nonce = new byte[NONCE_LENGTH];
+        byte[] cipherBytes = new byte[encrypted.length - NONCE_LENGTH];
+
+        System.arraycopy(encrypted, 0, nonce, 0, NONCE_LENGTH);
+        System.arraycopy(encrypted, NONCE_LENGTH, cipherBytes, 0, cipherBytes.length);
+
+        Cipher cipher = Cipher.getInstance(ALGORITHM);
+        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, nonce);
+        cipher.init(Cipher.DECRYPT_MODE, key, spec);
+
+        return cipher.doFinal(cipherBytes);
+    }
+
+
 }
