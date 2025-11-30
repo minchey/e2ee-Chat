@@ -3,6 +3,8 @@ package com.e2ee.server.tcp;
 import com.e2ee.server.protocol.AuthPayload;
 import com.e2ee.server.protocol.ChatMessage;
 import com.e2ee.server.protocol.MessageType;
+import com.e2ee.server.store.UserStore;
+import com.e2ee.server.store.HistoryStore;
 import com.google.gson.Gson;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
@@ -20,13 +22,15 @@ public class ChatTcpServer {
     private static final int PORT = 9000;
     private final Gson gson = new Gson();
 
-    // userTag -> printWriter
+    // userTag -> PrintWriter
     private final Map<String, PrintWriter> clientOutputs = new ConcurrentHashMap<>();
 
-    // id -> password
-    private final Map<String, String> users = new ConcurrentHashMap<>();
+    // 파일 기반 유저 저장소 + 히스토리 저장소
+    private final UserStore userStore = new UserStore();
+    private final HistoryStore historyStore = new HistoryStore();
 
 
+    // 서버 시작
     @PostConstruct
     public void start() {
         Thread t = new Thread(() -> {
@@ -37,8 +41,10 @@ public class ChatTcpServer {
                     Socket client = serverSocket.accept();
                     System.out.println("[TCP] 클라이언트 접속: " + client);
 
-                    new Thread(() -> handleClient(client),
-                            "client-" + client.getPort()).start();
+                    new Thread(
+                            () -> handleClient(client),
+                            "client-" + client.getPort()
+                    ).start();
                 }
 
             } catch (Exception e) {
@@ -66,6 +72,7 @@ public class ChatTcpServer {
                 ChatMessage msg = gson.fromJson(line, ChatMessage.class);
                 System.out.println("[서버 RAW] " + line);
 
+                // sender → out 매핑 (처음만 등록됨)
                 clientOutputs.putIfAbsent(msg.getSender(), out);
 
                 handleMessage(msg, out);
@@ -77,18 +84,22 @@ public class ChatTcpServer {
     }
 
 
+    // ============ 회원가입 ============
     private void handleSignup(ChatMessage msg, PrintWriter out) {
 
         AuthPayload p = gson.fromJson(msg.getBody(), AuthPayload.class);
         String id = p.getId();
         String pw = p.getPassword();
+        String publicKey = p.getPublicKey();   // 🔥 회원가입 body에 공개키 포함해야 함
 
         String result;
-        if (users.containsKey(id)) {
+
+        if (userStore.exists(id)) {
             result = "SIGNUP_FAIL:ID_EXISTS";
         } else {
-            users.put(id, pw);
+            userStore.addUser(id, pw, publicKey);
             result = "SIGNUP_OK";
+            System.out.println("[AUTH] 새 회원가입: " + id);
         }
 
         ChatMessage res = new ChatMessage(
@@ -103,6 +114,7 @@ public class ChatTcpServer {
     }
 
 
+    // ============ 로그인 ============
     private void handleLogin(ChatMessage msg, PrintWriter out) {
 
         AuthPayload p = gson.fromJson(msg.getBody(), AuthPayload.class);
@@ -111,8 +123,8 @@ public class ChatTcpServer {
 
         String result;
 
-        if (!users.containsKey(id)) result = "LOGIN_FAIL:ID_NOT_FOUND";
-        else if (!users.get(id).equals(pw)) result = "LOGIN_FAIL:BAD_PASSWORD";
+        if (!userStore.exists(id)) result = "LOGIN_FAIL:ID_NOT_FOUND";
+        else if (!userStore.checkPassword(id, pw)) result = "LOGIN_FAIL:BAD_PASSWORD";
         else result = "LOGIN_OK";
 
         ChatMessage res = new ChatMessage(
@@ -127,70 +139,109 @@ public class ChatTcpServer {
     }
 
 
-    // ============ KEY_REQ: 상대에게 그대로 전달 ============
+    // ================= KEY_REQ → 서버가 직접 KEY_RES 보내기 ==================
     private void handleKeyRequest(ChatMessage msg) {
-        PrintWriter target = clientOutputs.get(msg.getReceiver());
-        if (target != null) target.println(gson.toJson(msg));
+
+        String targetId = msg.getReceiver();
+
+        // 🔥 서버에 저장된 공개키 꺼내기
+        String targetPubKey = userStore.getPublicKey(targetId);
+
+        if (targetPubKey == null) {
+            // 상대 없음
+            PrintWriter senderOut = clientOutputs.get(msg.getSender());
+            if (senderOut != null) {
+                ChatMessage warn = new ChatMessage(
+                        MessageType.SYSTEM,
+                        "server",
+                        msg.getSender(),
+                        "NO_SUCH_USER:" + targetId,
+                        msg.getTimestamp()
+                );
+                senderOut.println(gson.toJson(warn));
+            }
+            return;
+        }
+
+        // 🔥 KEY_RES 생성
+        ChatMessage res = new ChatMessage(
+                MessageType.KEY_RES,
+                "server",               // server → requester
+                msg.getSender(),        // 요청자에게 보내기
+                targetPubKey,           // 공개키
+                msg.getTimestamp()
+        );
+
+        PrintWriter senderOut = clientOutputs.get(msg.getSender());
+        if (senderOut != null) senderOut.println(gson.toJson(res));
+
+        System.out.println("[KEY] 서버가 공개키 전달: " +
+                msg.getReceiver() + " → " + msg.getSender());
     }
 
-    // ============ KEY_RES: 상대에게 그대로 전달 ============
-    private void handleKeyResponse(ChatMessage msg) {
-        PrintWriter target = clientOutputs.get(msg.getReceiver());
-        if (target != null) target.println(gson.toJson(msg));
+
+    // ================= CHAT 릴레이 + 히스토리 저장 ==================
+    private void handleChat(ChatMessage msg, PrintWriter out) {
+
+        System.out.println("[서버][CHAT] " +
+                msg.getSender() + " -> " + msg.getReceiver() +
+                " : " + msg.getBody());
+
+        // 🔥 서버는 내용 해독 없이 그대로 저장
+        historyStore.add(msg);
+
+        String json = gson.toJson(msg);
+
+        // 전체방
+        if ("ALL".equalsIgnoreCase(msg.getReceiver())) {
+            for (PrintWriter w : clientOutputs.values()) {
+                w.println(json);
+            }
+            return;
+        }
+
+        // 1:1 메시지
+        PrintWriter targetOut = clientOutputs.get(msg.getReceiver());
+        if (targetOut != null) {
+            targetOut.println(json);
+        } else {
+            // 대상이 오프라인
+            ChatMessage warn = new ChatMessage(
+                    MessageType.SYSTEM,
+                    "server",
+                    msg.getSender(),
+                    "TARGET_OFFLINE:" + msg.getReceiver(),
+                    msg.getTimestamp()
+            );
+            out.println(gson.toJson(warn));
+        }
     }
 
 
+    // ============ 메시지 분배 ===============
     private void handleMessage(ChatMessage msg, PrintWriter out) {
 
         if (msg.getType() == MessageType.AUTH_SIGNUP) {
             handleSignup(msg, out);
             return;
+        }
 
-        } else if (msg.getType() == MessageType.AUTH_LOGIN) {
+        if (msg.getType() == MessageType.AUTH_LOGIN) {
             handleLogin(msg, out);
-            return;
-
-        } else if (msg.getType() == MessageType.KEY_REQ) {
-            handleKeyRequest(msg);
-            return;
-
-        } else if (msg.getType() == MessageType.KEY_RES) {
-            handleKeyResponse(msg);
             return;
         }
 
-        // ===================== CHAT =====================
+        if (msg.getType() == MessageType.KEY_REQ) {
+            handleKeyRequest(msg);
+            return;
+        }
+
         if (msg.getType() == MessageType.CHAT) {
-
-            System.out.println("[서버][CHAT] " +
-                    msg.getSender() + " -> " + msg.getReceiver() +
-                    " : " + msg.getBody());
-
-            String json = gson.toJson(msg);
-
-            if ("ALL".equalsIgnoreCase(msg.getReceiver())) {
-                for (PrintWriter w : clientOutputs.values()) {
-                    w.println(json);
-                }
-            } else {
-                PrintWriter target = clientOutputs.get(msg.getReceiver());
-                if (target != null) {
-                    target.println(json);
-                } else {
-                    ChatMessage warn = new ChatMessage(
-                            MessageType.SYSTEM,
-                            "server",
-                            msg.getSender(),
-                            "TARGET_OFFLINE:" + msg.getReceiver(),
-                            msg.getTimestamp()
-                    );
-                    out.println(gson.toJson(warn));
-                }
-            }
-
+            handleChat(msg, out);
             return;
         }
 
         System.out.println("[서버] 알 수 없는 타입: " + msg.getType());
     }
+
 }
