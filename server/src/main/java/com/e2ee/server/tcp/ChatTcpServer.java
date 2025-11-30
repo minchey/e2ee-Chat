@@ -85,33 +85,58 @@ public class ChatTcpServer {
 
 
     // ============ 회원가입 ============
+    // ----------------------------------------------------
+    // 3-1) 회원가입 처리 (id, pw, publicKey 저장)
+    // ----------------------------------------------------
     private void handleSignup(ChatMessage msg, PrintWriter out) {
 
         AuthPayload p = gson.fromJson(msg.getBody(), AuthPayload.class);
+
         String id = p.getId();
         String pw = p.getPassword();
-        String publicKey = p.getPublicKey();   // 🔥 회원가입 body에 공개키 포함해야 함
+        String publicKey = p.getPublicKey();  // ★ 여기서 공개키를 읽음
 
-        String result;
+        if (id == null || pw == null || publicKey == null) {
+            ChatMessage res = new ChatMessage(
+                    MessageType.AUTH_RESULT,
+                    "server",
+                    msg.getSender(),
+                    "SIGNUP_FAIL:BAD_PAYLOAD",
+                    msg.getTimestamp()
+            );
+            out.println(gson.toJson(res));
+            return;
+        }
 
         if (userStore.exists(id)) {
-            result = "SIGNUP_FAIL:ID_EXISTS";
-        } else {
-            userStore.addUser(id, pw, publicKey);
-            result = "SIGNUP_OK";
-            System.out.println("[AUTH] 새 회원가입: " + id);
+            // 이미 존재
+            ChatMessage res = new ChatMessage(
+                    MessageType.AUTH_RESULT,
+                    "server",
+                    msg.getSender(),
+                    "SIGNUP_FAIL:ID_EXISTS",
+                    msg.getTimestamp()
+            );
+            out.println(gson.toJson(res));
+            return;
         }
+
+        // ★ 저장: id, pw, publicKey
+        userStore.addUser(id, pw, publicKey);
+
+        System.out.println("[AUTH] 회원가입 완료: " + id);
 
         ChatMessage res = new ChatMessage(
                 MessageType.AUTH_RESULT,
                 "server",
                 msg.getSender(),
-                result,
+                "SIGNUP_OK",
                 msg.getTimestamp()
         );
 
         out.println(gson.toJson(res));
     }
+
 
 
     // ============ 로그인 ============
